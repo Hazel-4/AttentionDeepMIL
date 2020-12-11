@@ -1,14 +1,11 @@
 from __future__ import print_function, division
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.optim import lr_scheduler
-from torch.autograd import Variable
-from torchvision import  models, transforms
+from torchvision import models, transforms
 
 import time
 import os
+import util_data
 from torch.utils.data import Dataset
 
 from PIL import Image
@@ -23,7 +20,7 @@ from PIL import Image
 def default_loader(path):
     try:
         img = Image.open(path)
-        return img.convert('RGB')
+        return img.convert('L')
     except:
         print("Cannot read image: {}".format(path))
 
@@ -39,18 +36,29 @@ class customData(Dataset):
         self.data_transforms = data_transforms
         self.loader = loader
 
+
         # img_name, img_label 映射成数字
         for i in range(len(self.img_name)):
-            # img_name 映射成数字
-            self.img_name[i], _ = self.img_name[i].split('_')
-            var = str(ord(self.img_name[i][0]) - ord('A'))
-            self.img_name[i] = int(var + self.img_name[i][1:])
+
+            # # img_name 映射成数字
+            # self.img_name[i], _ = self.img_name[i].split('_')
+            # var = str(ord(self.img_name[i][0]) - ord('A'))
+            # self.img_name[i] = int(var + self.img_name[i][1:])
 
             # img_label 映射成数字
+            # funi: 1  no_funi: 0
             if self.img_label[i] == "funi":
-                self.img_label[i] = 1
+                self.img_label[i] = True
             else:
-                self.img_label[i] = 0
+                self.img_label[i] = False
+
+        #
+        # for i in range(len(self.img_name)):
+        #     if self.img_label[i] == "funi":
+        #         self.img_label[i] = True
+        #     else:
+        #         self.img_label[i] = False
+
 
     def __len__(self):
         return len(self.img_path)
@@ -69,15 +77,21 @@ class customData(Dataset):
             #     print("Cannot transform image: {}".format(img_name))
         return img_name, img, label
 
+
 if __name__ == "__main__":
-    loader = customData(txt_path='./data/image.txt',
+    img_name, img_path, img_label = util_data.get_img_infos("./data/image.txt")
+    train_bag_name, test_bag_name = util_data.split_train_tset(img_name, img_label)
+    num_in_train, num_in_test = util_data.generate_train_test_txt("./data/train.txt", "./data/test.txt",
+                                                                            train_bag_name, test_bag_name,
+                                                                            img_name, img_path, img_label)
+    loader = customData(txt_path='./data/train.txt',
                data_transforms=transforms.Compose([
                    transforms.RandomResizedCrop(224),
                    transforms.RandomHorizontalFlip(),
                    transforms.ToTensor()
                    # transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
                ]))
-    dataloaders = torch.utils.data.DataLoader(loader, batch_size=32, shuffle=True)
-    # print(dataloaders)
+    dataloaders = torch.utils.data.DataLoader(loader, batch_size=num_in_train, shuffle=True)
     for (batch_name, batch_data, batch_labels) in dataloaders:
-        print(len(batch_data))
+        print(batch_name, batch_data.size(), batch_labels)
+
